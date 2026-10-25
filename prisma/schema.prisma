@@ -1,0 +1,614 @@
+// ==============================================================================
+// TeamSync AI — Prisma Schema (PostgreSQL 18 + Prisma ORM 7)
+// Capstone Student Project Team Formation & Contribution Intelligence Platform
+// ==============================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ------------------------------------------------------------------------------
+// Enums
+// ------------------------------------------------------------------------------
+
+enum SystemRole {
+  STUDENT
+  FACULTY
+  ADMIN
+}
+
+enum StudentRole {
+  FRONTEND
+  BACKEND
+  FULLSTACK
+  AIML
+  DEVOPS
+  UIUX
+  QA
+}
+
+enum SkillCategory {
+  LANGUAGES
+  FRONTEND
+  BACKEND
+  DATABASE
+  DEVOPS
+  AI_ML
+  TOOLS
+  CONCEPTS
+}
+
+enum ProficiencyLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum ProjectStatus {
+  DRAFT
+  RECRUITING
+  IN_PROGRESS
+  COMPLETED
+  ARCHIVED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INACTIVE
+  LEFT
+  REMOVED
+}
+
+enum TeamLifecycleStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
+enum MilestoneStatus {
+  PLANNED
+  IN_PROGRESS
+  IN_REVIEW
+  COMPLETED
+  OVERDUE
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum EvidenceType {
+  PULL_REQUEST
+  COMMIT_HASH
+  DESIGN_FILE
+  TEST_REPORT
+  DOCUMENT
+  DEPLOYED_URL
+  OTHER
+}
+
+enum EvidenceReviewStatus {
+  PENDING
+  VERIFIED
+  CONTESTED
+  REJECTED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  MEDIATION
+  RESOLVED
+  DISMISSED
+}
+
+// ------------------------------------------------------------------------------
+// Domain 1: User Identity & Student Profile
+// ------------------------------------------------------------------------------
+
+model User {
+  id            String      @id @default(cuid())
+  name          String
+  email         String      @unique
+  emailVerified Boolean     @default(false)
+  image         String?
+  role          SystemRole  @default(STUDENT)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // 1-to-1 Student Profile
+  studentProfile StudentProfile?
+
+  // Project Ownership
+  ownedProjects Project[] @relation("ProjectOwner")
+
+  // Team Participation
+  teamMemberships     TeamMembership[]
+  sentInvitations     TeamInvitation[] @relation("InvitationSender")
+  receivedInvitations TeamInvitation[] @relation("InvitationRecipient")
+
+  // Tasks
+  createdTasks  Task[] @relation("TaskCreator")
+  assignedTasks Task[] @relation("TaskAssignee")
+
+  // Contribution Evidence & Reviews
+  submittedEvidence ContributionEvidence[] @relation("EvidenceSubmitter")
+  verifiedEvidence  ContributionEvidence[] @relation("EvidenceVerifier")
+  evidenceReviews   EvidenceReview[]
+
+  // Disputes
+  initiatedDisputes ContributionDispute[] @relation("DisputeInitiator")
+  targetedDisputes  ContributionDispute[] @relation("DisputeRespondent")
+  resolvedDisputes  ContributionDispute[] @relation("DisputeResolver")
+  disputeComments   DisputeComment[]
+
+  // Audit Trail
+  auditLogs AuditLog[]
+
+  // Better Auth relations
+  sessions Session[]
+  accounts Account[]
+}
+
+model StudentProfile {
+  id                   String      @id @default(cuid())
+  userId               String      @unique
+  user                 User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  headline             String?
+  bio                  String?
+  department           String?
+  yearOfStudy          Int?
+  preferredRole        StudentRole @default(FULLSTACK)
+  weeklyAvailableHours Int         @default(15)
+  maxActiveProjects    Int         @default(2)
+  githubUrl            String?
+  linkedinUrl          String?
+  portfolioUrl         String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  skills            StudentSkill[]
+  interests         StudentInterest[]
+  availabilitySlots AvailabilitySlot[]
+}
+
+model Skill {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  category  SkillCategory @default(LANGUAGES)
+  createdAt DateTime      @default(now())
+
+  studentSkills       StudentSkill[]
+  projectRequirements ProjectRequirement[]
+}
+
+model Interest {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  studentInterests StudentInterest[]
+  projectInterests ProjectInterest[]
+}
+
+model StudentSkill {
+  id               String           @id @default(cuid())
+  studentProfileId String
+  studentProfile   StudentProfile   @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  skillId          String
+  skill            Skill            @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  proficiency      ProficiencyLevel @default(INTERMEDIATE)
+  isVerified       Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+
+  @@unique([studentProfileId, skillId])
+  @@index([skillId])
+}
+
+model AvailabilitySlot {
+  id               String         @id @default(cuid())
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  dayOfWeek        DayOfWeek
+  startHour        Int
+  endHour          Int
+  createdAt        DateTime       @default(now())
+
+  @@index([studentProfileId, dayOfWeek])
+}
+
+model StudentInterest {
+  id               String         @id @default(cuid())
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  interestId       String
+  interest         Interest       @relation(fields: [interestId], references: [id], onDelete: Restrict)
+  createdAt        DateTime       @default(now())
+
+  @@unique([studentProfileId, interestId])
+  @@index([interestId])
+}
+
+// ------------------------------------------------------------------------------
+// Domain 2: Projects & Requirements
+// ------------------------------------------------------------------------------
+
+model Project {
+  id             String        @id @default(cuid())
+  title          String
+  slug           String        @unique
+  description    String
+  domain         String
+  ownerId        String
+  owner          User          @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  status         ProjectStatus @default(RECRUITING)
+  minTeamSize    Int           @default(3)
+  maxTeamSize    Int           @default(5)
+  activeTeamId   String?       @unique
+  activeTeam     Team?         @relation("ProjectActiveTeam", fields: [activeTeamId], references: [id], onDelete: SetNull)
+  targetDeadline DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  teams          Team[]
+  requirements   ProjectRequirement[]
+  interests      ProjectInterest[]
+  matchingConfig ProjectMatchingConfig?
+
+  @@index([ownerId])
+  @@index([status])
+}
+
+model ProjectInterest {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  interestId String
+  interest   Interest @relation(fields: [interestId], references: [id], onDelete: Restrict)
+  createdAt  DateTime @default(now())
+
+  @@unique([projectId, interestId])
+  @@index([interestId])
+}
+
+model ProjectRequirement {
+  id                 String           @id @default(cuid())
+  projectId          String
+  project            Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  skillId            String
+  skill              Skill            @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  minimumProficiency ProficiencyLevel @default(INTERMEDIATE)
+  isRequired         Boolean          @default(true)
+  roleNeeded         StudentRole?
+  createdAt          DateTime         @default(now())
+
+  @@unique([projectId, skillId])
+  @@index([skillId])
+}
+
+model ProjectMatchingConfig {
+  id                 String   @id @default(cuid())
+  projectId          String   @unique
+  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  skillWeight        Float    @default(0.40)
+  availabilityWeight Float    @default(0.25)
+  interestWeight     Float    @default(0.15)
+  roleWeight         Float    @default(0.10)
+  workloadWeight     Float    @default(0.10)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+// ------------------------------------------------------------------------------
+// Domain 3: Teams, Memberships & Invitations
+// ------------------------------------------------------------------------------
+
+model Team {
+  id        String             @id @default(cuid())
+  name      String
+  projectId String
+  project   Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status    TeamLifecycleStatus @default(ACTIVE)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  memberships TeamMembership[]
+  invitations TeamInvitation[]
+  milestones  Milestone[]
+  tasks       Task[]
+  evidence    ContributionEvidence[]
+  disputes    ContributionDispute[]
+  activeForProject Project?    @relation("ProjectActiveTeam")
+
+  @@index([projectId])
+  @@index([projectId, status])
+}
+
+model TeamMembership {
+  id        String           @id @default(cuid())
+  teamId    String
+  team      Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  role      StudentRole      @default(FULLSTACK)
+  isLead    Boolean          @default(false)
+  status    MembershipStatus @default(ACTIVE)
+  joinedAt  DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([teamId, userId])
+  @@index([userId])
+  @@index([teamId, status])
+}
+
+model TeamInvitation {
+  id            String           @id @default(cuid())
+  teamId        String
+  team          Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  invitedUserId String
+  invitedUser   User             @relation("InvitationRecipient", fields: [invitedUserId], references: [id], onDelete: Cascade)
+  invitedById   String
+  invitedBy     User             @relation("InvitationSender", fields: [invitedById], references: [id], onDelete: Restrict)
+  roleOffered   StudentRole      @default(FULLSTACK)
+  status        InvitationStatus @default(PENDING)
+  message       String?
+  expiresAt     DateTime
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([teamId])
+  @@index([invitedUserId, status])
+}
+
+// ------------------------------------------------------------------------------
+// Domain 4: Milestones, Tasks & Dependencies
+// ------------------------------------------------------------------------------
+
+model Milestone {
+  id          String          @id @default(cuid())
+  teamId      String
+  team        Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  order       Int             @default(1)
+  dueDate     DateTime
+  status      MilestoneStatus @default(PLANNED)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  tasks Task[]
+
+  @@index([teamId, order])
+  @@index([teamId, status])
+}
+
+model Task {
+  id             String       @id @default(cuid())
+  teamId         String
+  team           Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  milestoneId    String?
+  milestone      Milestone?   @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  title          String
+  description    String?
+  status         TaskStatus   @default(BACKLOG)
+  priority       TaskPriority @default(MEDIUM)
+  estimatedHours Int          @default(5)
+  dueDate        DateTime?
+  createdById    String
+  createdBy      User         @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  assigneeId     String?
+  assignee       User?        @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  dependencies     TaskDependency[]       @relation("DependentTask")
+  dependentsOnThis TaskDependency[]       @relation("PrerequisiteTask")
+  evidenceItems    ContributionEvidence[]
+  disputes         ContributionDispute[]
+
+  @@index([teamId, status])
+  @@index([assigneeId])
+  @@index([milestoneId])
+}
+
+model TaskDependency {
+  id              String   @id @default(cuid())
+  taskId          String
+  task            Task     @relation("DependentTask", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOnTaskId String
+  dependsOnTask   Task     @relation("PrerequisiteTask", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+
+  @@unique([taskId, dependsOnTaskId])
+  @@index([taskId])
+  @@index([dependsOnTaskId])
+}
+
+// ------------------------------------------------------------------------------
+// Domain 5: Contribution Evidence & Review History
+// ------------------------------------------------------------------------------
+
+model ContributionEvidence {
+  id             String               @id @default(cuid())
+  teamId         String
+  team           Team                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  taskId         String?
+  task           Task?                @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  submittedById  String
+  submittedBy    User                 @relation("EvidenceSubmitter", fields: [submittedById], references: [id], onDelete: Restrict)
+  type           EvidenceType
+  urlOrReference String
+  description    String
+  submittedAt    DateTime             @default(now())
+  reviewStatus   EvidenceReviewStatus @default(PENDING)
+  verifiedById   String?
+  verifiedBy     User?                @relation("EvidenceVerifier", fields: [verifiedById], references: [id], onDelete: SetNull)
+  verifiedAt     DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  reviews  EvidenceReview[]
+  disputes ContributionDispute[]
+
+  @@index([teamId, reviewStatus])
+  @@index([submittedById])
+  @@index([taskId])
+}
+
+model EvidenceReview {
+  id         String               @id @default(cuid())
+  evidenceId String
+  evidence   ContributionEvidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  reviewerId String
+  reviewer   User                 @relation(fields: [reviewerId], references: [id], onDelete: Restrict)
+  status     EvidenceReviewStatus
+  comment    String
+  createdAt  DateTime             @default(now())
+
+  @@index([evidenceId])
+  @@index([reviewerId])
+}
+
+// ------------------------------------------------------------------------------
+// Domain 6: Contribution Disputes & Audit Trail
+// ------------------------------------------------------------------------------
+
+model ContributionDispute {
+  id              String         @id @default(cuid())
+  teamId          String
+  team            Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  initiatorId     String
+  initiator       User           @relation("DisputeInitiator", fields: [initiatorId], references: [id], onDelete: Restrict)
+  respondentId    String?
+  respondent      User?          @relation("DisputeRespondent", fields: [respondentId], references: [id], onDelete: SetNull)
+  taskId          String?
+  task            Task?          @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  evidenceId      String?
+  evidence        ContributionEvidence? @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  title           String
+  reason          String
+  status          DisputeStatus  @default(OPEN)
+  resolutionNotes String?
+  resolvedById    String?
+  resolvedBy      User?          @relation("DisputeResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  comments DisputeComment[]
+
+  @@index([teamId, status])
+  @@index([initiatorId])
+  @@index([respondentId])
+  @@index([resolvedById])
+}
+
+model DisputeComment {
+  id        String              @id @default(cuid())
+  disputeId String
+  dispute   ContributionDispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User                @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  message   String
+  createdAt DateTime            @default(now())
+
+  @@index([disputeId])
+  @@index([authorId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
