@@ -1,0 +1,81 @@
+.avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background-color: var(--primary-subtle);
+  color: var(--primary);
+  font-family: inherit;
+  font-weight: var(--font-weight-semibold);
+  user-select: none;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+}
+
+/* Sizes */
+.sm {
+  width: 28px;
+  height: 28px;
+  font-size: var(--text-xs);
+}
+
+.md {
+  width: 38px;
+  height: 38px;
+  font-size: var(--text-sm);
+}
+
+.lg {
+  width: 48px;
+  height: 48px;
+  font-size: var(--text-base);
+}
+
+.xl {
+  width: 64px;
+  height: 64px;
+  font-size: var(--text-xl);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.initials {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Status indicator dot */
+.statusDot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 25%;
+  height: 25%;
+  min-width: 8px;
+  min-height: 8px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--bg-surface);
+}
+
+.status_online {
+  background-color: var(--color-success);
+}
+
+.status_busy {
+  background-color: var(--color-danger);
+}
+
+.status_away {
+  background-color: var(--color-warning);
+}
+
+.status_offline {
+  background-color: var(--text-subtle);
+}
